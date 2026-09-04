@@ -632,11 +632,6 @@ fun SongGridItem(
             shape = RoundedCornerShape(ThumbnailCornerRadius),
             modifier = Modifier.size(gridHeight)
         )
-        if (!isActive) {
-            OverlayPlayButton(
-                visible = true
-            )
-        }
     },
     fillMaxWidth = fillMaxWidth,
     modifier = modifier
@@ -849,29 +844,11 @@ fun AlbumGridItem(
     },
     badges = badges,
     thumbnailContent = {
-        val database = LocalDatabase.current
-        val playerConnection = LocalPlayerConnection.current ?: return@GridItem
-        val scope = rememberCoroutineScope()
-
         ItemThumbnail(
             thumbnailUrl = album.album.thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
             shape = RoundedCornerShape(ThumbnailCornerRadius),
-        )
-
-        AlbumPlayButton(
-            visible = !isActive,
-            onClick = {
-                scope.launch {
-                    val albumWithSongs = withContext(Dispatchers.IO) {
-                        database.albumWithSongs(album.id).firstOrNull()
-                    }
-                    albumWithSongs?.let {
-                        playerConnection.playQueue(LocalAlbumRadio(it))
-                    }
-                }
-            }
         )
     },
     fillMaxWidth = fillMaxWidth,
@@ -1298,41 +1275,11 @@ fun YouTubeGridItem(
     },
     badges = badges,
     thumbnailContent = {
-        val database = LocalDatabase.current
-        val playerConnection = LocalPlayerConnection.current ?: return@GridItem
-        val scope = rememberCoroutineScope()
-
         ItemThumbnail(
             thumbnailUrl = item.thumbnail,
             isActive = isActive,
             isPlaying = isPlaying,
             shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius),
-        )
-
-        if (item is SongItem && !isActive) {
-            OverlayPlayButton(
-                visible = true
-            )
-        }
-
-        AlbumPlayButton(
-            visible = item is AlbumItem && !isActive,
-            onClick = {
-                scope.launch(Dispatchers.IO) {
-                    var albumWithSongs = database.albumWithSongs(item.id).first()
-                    if (albumWithSongs?.songs.isNullOrEmpty()) {
-                        YouTube.album(item.id).onSuccess { albumPage ->
-                            database.transaction { insert(albumPage) }
-                            albumWithSongs = database.albumWithSongs(item.id).first()
-                        }.onFailure { reportException(it) }
-                    }
-                    albumWithSongs?.let {
-                        withContext(Dispatchers.Main) {
-                            playerConnection.playQueue(LocalAlbumRadio(it))
-                        }
-                    }
-                }
-            }
         )
     },
     thumbnailRatio = thumbnailRatio,
@@ -1374,8 +1321,6 @@ fun LocalSongsGrid(
             isPlaying = isPlaying,
             shape = RoundedCornerShape(ThumbnailCornerRadius),
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
-            showCenterPlay = true,
-            playButtonVisible = false
         )
     },
     fillMaxWidth = fillMaxWidth,
@@ -1416,8 +1361,6 @@ fun LocalArtistsGrid(
             isPlaying = false,
             shape = CircleShape,
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
-            showCenterPlay = false,
-            playButtonVisible = false
         )
     },
     fillMaxWidth = fillMaxWidth,
@@ -1458,8 +1401,6 @@ fun LocalAlbumsGrid(
             isPlaying = isPlaying,
             shape = RoundedCornerShape(ThumbnailCornerRadius),
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
-            showCenterPlay = false,
-            playButtonVisible = true
         )
     },
     fillMaxWidth = fillMaxWidth,
@@ -1555,8 +1496,6 @@ fun LocalThumbnail(
     isPlaying: Boolean,
     shape: Shape,
     modifier: Modifier = Modifier,
-    showCenterPlay: Boolean = false,
-    playButtonVisible: Boolean = false,
     thumbnailRatio: Float = 1f
 ) {
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
@@ -1596,56 +1535,6 @@ fun LocalThumbnail(
                         modifier = Modifier.height(24.dp)
                     )
                 } else {
-                    Icon(
-                        painter = painterResource(R.drawable.play),
-                        contentDescription = null,
-                        tint = Color.White
-                    )
-                }
-            }
-        }
-
-        if (showCenterPlay) {
-            AnimatedVisibility(
-                visible = !(isActive && isPlaying),
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(8.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.6f))
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.play),
-                        contentDescription = null,
-                        tint = Color.White
-                    )
-                }
-            }
-        }
-
-        if (playButtonVisible) {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = ActiveBoxAlpha))
-                ) {
                     Icon(
                         painter = painterResource(R.drawable.play),
                         contentDescription = null,
@@ -1726,34 +1615,6 @@ fun PlaylistThumbnail(
 }
 
 @Composable
-fun BoxScope.OverlayPlayButton(
-    visible: Boolean
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier
-            .align(Alignment.Center)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = ActiveBoxAlpha))
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.play),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
 fun BoxScope.OverlayEditButton(
     visible: Boolean,
     onClick: () -> Unit,
@@ -1781,36 +1642,6 @@ fun BoxScope.OverlayEditButton(
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun BoxScope.AlbumPlayButton(
-    visible: Boolean,
-    onClick: () -> Unit,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(8.dp)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = ActiveBoxAlpha))
-                .clickable(onClick = onClick)
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.play),
-                contentDescription = null,
-                tint = Color.White
             )
         }
     }
