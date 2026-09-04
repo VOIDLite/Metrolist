@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -85,6 +86,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -678,6 +680,8 @@ fun Queue(
                 }
             }
 
+        val activeQueueIndex = mutableQueueWindows.indexOfFirst { it.uid == currentPlayingUid }
+
         val reorderableState =
             rememberReorderableLazyListState(
                 lazyListState = lazyListState,
@@ -776,6 +780,14 @@ fun Queue(
                     ReorderableItem(
                         state = reorderableState,
                         key = window.uid.hashCode(),
+                        modifier =
+                            when {
+                                activeQueueIndex != -1 && index == activeQueueIndex ->
+                                    Modifier.zIndex(1f)
+                                activeQueueIndex != -1 && index == activeQueueIndex + 1 ->
+                                    Modifier.offset(y = (-12).dp)
+                                else -> Modifier
+                            },
                     ) {
                         val currentItem by rememberUpdatedState(window)
                         val isActive = window.uid == currentPlayingUid
@@ -829,6 +841,15 @@ fun Queue(
                         }
 
                         val content: @Composable () -> Unit = {
+                            val cardShape = RoundedCornerShape(16.dp)
+                            val isFrontCard = index == activeQueueIndex
+                            val cardColor =
+                                if (isFrontCard) {
+                                    MaterialTheme.colorScheme.surfaceContainerHighest
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                }
+
                             Row(
                                 horizontalArrangement = Arrangement.Center,
                                 modifier = Modifier.animateItem(),
@@ -886,7 +907,20 @@ fun Queue(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .background(background)
+                                            .padding(horizontal = 10.dp, vertical = 3.dp)
+                                            .clip(cardShape)
+                                            .background(cardColor, cardShape)
+                                            .then(
+                                                if (isFrontCard) {
+                                                    Modifier.border(
+                                                        1.dp,
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                        cardShape,
+                                                    )
+                                                } else {
+                                                    Modifier
+                                                },
+                                            )
                                             .combinedClickable(
                                                 onClick = {
                                                     if (inSelectMode) {
