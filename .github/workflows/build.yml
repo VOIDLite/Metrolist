@@ -27,7 +27,11 @@ jobs:
   build_release:
     name: Build Release (${{ matrix.variant }})
     if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # ubuntu-latest = GitHub-hosted standard runner (2 vCPU, 7GB RAM, 14GB SSD).
+    # This is the highest spec available for FREE on public/open-source repos.
+    # Anything above 2 vCPU ("larger runners": 4/8/16/32/64 vCPU) is billed
+    # per-minute by GitHub even on public repos, so it doesn't fit a free account.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     strategy:
@@ -100,7 +104,7 @@ jobs:
   build_debug:
     name: Build Debug (${{ matrix.variant }})
     if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     strategy:
